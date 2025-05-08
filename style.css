@@ -1,0 +1,104 @@
+.ipa-card-floating {
+  position: absolute;
+  z-index: 9999;
+  background: #fff;
+  border: 1.5px solid #3e4a5e;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(60,60,60,0.15);
+  padding: 22px 28px 18px 28px;
+  min-width: 260px;
+  max-width: 420px;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  font-size: 1.28rem;
+  color: #1a1a1a;
+  transition: box-shadow 0.2s;
+}
+.ipa-card-floating strong, .ipa-card-floating .di-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #274690;
+  margin-bottom: 10px;
+  display: block;
+}
+.ipa-card-floating .posgram, .ipa-card-floating .pos {
+  color: #6a7684;
+  font-size: 0.9em;
+  margin-bottom: 8px;
+}
+.ipa-card-floating .dpron-i {
+  display: inline-block;
+  margin-right: 18px;
+  margin-bottom: 6px;
+  padding: 6px 12px;
+  background: #f5f7fa;
+  border-radius: 7px;
+  font-size: 0.9em;
+}
+.ipa-card-floating .region {
+  color: #b36a00;
+  font-weight: bold;
+  margin-right: 4px;
+  font-size: 0.9em;
+}
+.ipa-card-floating .pron.dpron {
+  color: #274690;
+  font-size: 0.9em;
+  margin-left: 3px;
+}
+.ipa-card-floating .ipa {
+  color: #d7263d;
+  font-size: 0.85em; /* 让音标变小 */
+  font-family: 'Fira Mono', 'Consolas', monospace;
+  margin: 0 3px;
+}
+.ipa-card-floating .i-volume-up {
+  color: #009688;
+  cursor: pointer;
+  margin-left: 8px;
+  font-size: 0.8em;
+  display: inline-block;
+  vertical-align: middle;
+  transition: color 0.15s, transform 0.15s;
+}
+.ipa-card-floating .i-volume-up:hover {
+  color: #d7263d;
+  transform: scale(1.18);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.ipa-card-floating .i-volume-up:active {
+  color: #274690;
+  transform: scale(0.92);
+}
+.ipa-card-floating .daud {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 8px 0 0;
+  padding: 2px 6px 2px 4px;
+  background: #e8f5e9;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,150,136,0.06);
+  min-width: 30px;
+  min-height: 24px;
+  font-size: 1.08em;
+}
+.ipa-card-floating .daud .i-volume-up {
+  margin-left: 4px;
+  margin-right: 0;
+}
+.ipa-card-floating .daud[title],
+.ipa-card-floating .daud[title]:after {
+  cursor: pointer;
+}
+.ipa-card-floating .daud:hover {
+  background: #d0f2e0;
+  box-shadow: 0 2px 8px rgba(0,150,136,0.10);
+}
+.ipa-card-floating .daud:active {
+  background: #b2dfdb;
+}
+.ipa-card-floating .hdib[title*="pronunciation"] {
+  margin-left: 2px;
+}
+.ipa-card-floating audio {
+  display: none;
+}

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "IPA Phonetic Card",
+  "version": "1.0",
+  "description": "Show IPA transcription for selected words via Cambridge Dictionary.",
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": ["https://dictionary.cambridge.org/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["style.css"]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "192": "icon192.png"
+  }
+}
