@@ -39,17 +39,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // 提取最外层 <span class="trans dtrans dtrans-se  break-cj" lang="zh-Hans"> ... </span>，支持嵌套
 function extractOuterZhTransSpans(html) {
+  let processedHtml = html;
+  if (Array.isArray(html) && html.length > 0) {
+    processedHtml = html[0];
+  }
+
   const results = [];
   const openTag = '<span class="trans dtrans dtrans-se  break-cj" lang="zh-Hans">';
   let idx = 0;
-  while ((idx = html.indexOf(openTag, idx)) !== -1) {
+  while ((idx = processedHtml.indexOf(openTag, idx)) !== -1) {
     let start = idx + openTag.length;
     let end = start;
     let depth = 1;
     // 从start开始查找配对的</span>
     while (depth > 0) {
-      const nextOpen = html.indexOf('<span', end);
-      const nextClose = html.indexOf('</span>', end);
+      const nextOpen = processedHtml.indexOf('<span', end);
+      const nextClose = processedHtml.indexOf('</span>', end);
       if (nextClose === -1) break; // 没有闭合，直接退出
       if (nextOpen !== -1 && nextOpen < nextClose) {
         depth++;
@@ -60,7 +65,7 @@ function extractOuterZhTransSpans(html) {
       }
     }
     if (depth === 0) {
-      const content = html.slice(start, end - 7);
+      const content = processedHtml.slice(start, end - 7);
       results.push(content);
       idx = end;
     } else {
