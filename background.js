@@ -37,6 +37,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// 提取最外层 <span class="trans dtrans dtrans-se  break-cj" lang="zh-Hans"> ... </span>，支持嵌套
+function extractOuterZhTransSpans(html) {
+  const results = [];
+  const openTag = '<span class="trans dtrans dtrans-se  break-cj" lang="zh-Hans">';
+  let idx = 0;
+  while ((idx = html.indexOf(openTag, idx)) !== -1) {
+    let start = idx + openTag.length;
+    let end = start;
+    let depth = 1;
+    // 从start开始查找配对的</span>
+    while (depth > 0) {
+      const nextOpen = html.indexOf('<span', end);
+      const nextClose = html.indexOf('</span>', end);
+      if (nextClose === -1) break; // 没有闭合，直接退出
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        end = nextOpen + 5;
+      } else {
+        depth--;
+        end = nextClose + 7;
+      }
+    }
+    if (depth === 0) {
+      const content = html.slice(start, end - 7);
+      results.push(content);
+      idx = end;
+    } else {
+      // 没有配对，防止死循环
+      break;
+    }
+  }
+  return results;
+}
+
 function extractIPA(html) {
   try {
     // 1. 找到 <div class="di-body">，只取第一个
@@ -75,7 +109,53 @@ function extractIPA(html) {
       return null;
     }
     console.log(`[IPA EXT] Found ${blocks.length} pos-header blocks`);
-    return blocks.join('\n').trim();
+    let result = blocks.join('\n').trim();
+    // --- 追加英文释义和中文释义 ---
+    const posBodyToDefSrcRegex = /<div class="pos-body">([\s\S]*?)(?=<div class="definition-src ddef-src lbt lb-cm lpb-10">)/g;
+    const posBodyHtml = html.match(posBodyToDefSrcRegex);
+    if (!posBodyHtml) {
+      console.warn('[IPA EXT] No pos-body to def-src found');
+      return null;
+    }
+    console.log('[IPA EXT] pos-body to def-src found');
+    console.log('[IPA EXT] posBodyHtml:', posBodyHtml);
+ 
+      // 英文释义
+    let defList = [];
+    const defRegex = /<div class="def ddef_d db">([\s\S]*?)<\/div>/g;
+    let m;
+    let defMatchCount = 0;
+    while ((m = defRegex.exec(posBodyHtml)) !== null) {
+      let defHtml = m[1];
+      defHtml = defHtml.replace(/<a[^>]*>([\s\S]*?)<\/a>/g, '$1');
+      defHtml = defHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if(defHtml) defList.push(defHtml);
+      defMatchCount++;
+    }
+    console.log(`[IPA EXT] defRegex match count: ${defMatchCount}`);
+    if (defList.length) {
+      console.log('[IPA EXT] Extracted English definitions:', defList.slice(0, 3));
+      result += '<br>' + defList.map(d => `<div>${d}</div>`).join('');
+    } else {
+      console.warn('[IPA EXT] No English definitions extracted');
+    }
+    // 中文释义
+    let transList = [];
+    // 用 extractOuterZhTransSpans 提取最外层中文释义（函数已移到文件最外层）
+    const zhTransSpans = extractOuterZhTransSpans(posBodyHtml);
+    for (let content of zhTransSpans) {
+      let zhHtml = content.replace(/<a[^>]*>([\s\S]*?)<\/a>/g, '$1');
+      zhHtml = zhHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (zhHtml) transList.push(zhHtml);
+    }
+    console.log(`[IPA EXT] transRegex match count: ${zhTransSpans.length}`);
+    if (transList.length) {
+      console.log('[IPA EXT] Extracted Chinese translations:', transList.slice(0, 3));
+      result += transList.map(t => `<div>${t}</div>`).join('');
+    } else {
+      console.warn('[IPA EXT] No Chinese translations extracted');
+    }
+    return result.trim();
   } catch (err) {
     console.error('[IPA EXT] extractIPA error:', err);
     return null;

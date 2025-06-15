@@ -1,37 +1,43 @@
-// Listen for mouseup (text selection)
-document.addEventListener('mouseup', async (event) => {
-  const selection = window.getSelection();
-  const text = selection.toString().trim();
-  if (!text || text.split(/\s+/).length > 1) return;
+// Check if we're on Cambridge Dictionary website
+const isCambridgeDictionary = window.location.hostname.includes('dictionary.cambridge.org');
 
-  // Remove any existing IPA card
-  document.querySelectorAll('.ipa-card-floating').forEach(el => el.remove());
+// Only add event listeners if we're not on Cambridge Dictionary
+if (!isCambridgeDictionary) {
+  // Listen for mouseup (text selection)
+  document.addEventListener('mouseup', async (event) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+    if (!text || text.split(/\s+/).length > 1) return;
 
-  // Get selection position
-  const range = selection.rangeCount ? selection.getRangeAt(0) : null;
-  let x = event.pageX, y = event.pageY;
-  if (range) {
-    const rect = range.getBoundingClientRect();
-    x = rect.left + window.scrollX;
-    y = rect.bottom + window.scrollY;
-  }
+    // Remove any existing IPA card
+    document.querySelectorAll('.ipa-card-floating').forEach(el => el.remove());
 
-  // Request IPA from background
-  chrome.runtime.sendMessage({type: 'FETCH_IPA', word: text}, (response) => {
-    if (response && response.ipa) {
-      showIPACard(text, response.ipa, x, y);
-    } else {
-      showIPACard(text, 'IPA not found', x, y);
+    // Get selection position
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+    let x = event.pageX, y = event.pageY;
+    if (range) {
+      const rect = range.getBoundingClientRect();
+      x = rect.left + window.scrollX;
+      y = rect.bottom + window.scrollY;
+    }
+
+    // Request IPA from background
+    chrome.runtime.sendMessage({type: 'FETCH_IPA', word: text}, (response) => {
+      if (response && response.ipa) {
+        showIPACard(text, response.ipa, x, y);
+      } else {
+        showIPACard(text, 'IPA not found', x, y);
+      }
+    });
+  });
+
+  // Remove card on click elsewhere
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.ipa-card-floating')) {
+      document.querySelectorAll('.ipa-card-floating').forEach(el => el.remove());
     }
   });
-});
-
-// Remove card on click elsewhere
-document.addEventListener('mousedown', (e) => {
-  if (!e.target.closest('.ipa-card-floating')) {
-    document.querySelectorAll('.ipa-card-floating').forEach(el => el.remove());
-  }
-});
+}
 
 function showIPACard(word, ipa, x, y) {
   const card = document.createElement('div');
