@@ -104,7 +104,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'FETCH_MP3_PROXY' && message.url) {
-    cambridgeFetch(message.url, true)
+    // 卡片在网页 DOM 中，src 可被页面篡改：只允许剑桥的 mp3，防止带 cookie 请求任意地址
+    let mp3Url;
+    try {
+      mp3Url = new URL(message.url);
+    } catch (err) {
+      mp3Url = null;
+    }
+    if (!mp3Url || mp3Url.origin !== CAMBRIDGE_ORIGIN ||
+        !mp3Url.pathname.startsWith('/media/') || !mp3Url.pathname.endsWith('.mp3')) {
+      console.warn('[IPA EXT] Rejected MP3 URL:', message.url);
+      sendResponse({ base64: null });
+      return false;
+    }
+    cambridgeFetch(mp3Url.href, true)
       .then(({ status, body, error }) => {
         if (error || status < 200 || status >= 300) {
           console.error('[IPA EXT] MP3 fetch failed:', status, error);
