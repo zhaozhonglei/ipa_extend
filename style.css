@@ -102,3 +102,10 @@
 .ipa-card-floating audio {
   display: none;
 }
+/* 喇叭图标原本来自剑桥站点的图标字体，在其它网站不存在，按钮会是 0×0；用 emoji 代替 */
+.ipa-card-floating .i-volume-up::before {
+  content: "🔊";
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 16px;
+  line-height: 1;
+}

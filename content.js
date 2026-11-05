@@ -5,6 +5,8 @@ const isCambridgeDictionary = window.location.hostname.includes('dictionary.camb
 if (!isCambridgeDictionary) {
   // Listen for mouseup (text selection)
   document.addEventListener('mouseup', async (event) => {
+    // 点击卡片内部（如喇叭按钮）时不重新查词
+    if (event.target.closest && event.target.closest('.ipa-card-floating')) return;
     const selection = window.getSelection();
     const text = selection.toString().trim();
     if (!text || text.split(/\s+/).length > 1) return;
