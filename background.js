@@ -1,33 +1,117 @@
+const CAMBRIDGE_ORIGIN = 'https://dictionary.cambridge.org';
+
+function isChallenge(status, text) {
+  return status === 403 || /<title>\s*Just a moment/i.test(text || '');
+}
+
+// 先在后台直接请求；被 Cloudflare 拦截时，改到剑桥标签页里请求（同源，带用户已通过验证的会话）
+async function cambridgeFetch(url, asBase64) {
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (asBase64) {
+      if (res.ok) return { status: res.status, body: arrayBufferToBase64(await res.arrayBuffer()) };
+    } else {
+      const text = await res.text();
+      if (!isChallenge(res.status, text)) return { status: res.status, body: text };
+    }
+    console.warn('[IPA EXT] Direct fetch blocked (HTTP', res.status, '), retrying via Cambridge tab');
+  } catch (err) {
+    console.warn('[IPA EXT] Direct fetch failed, retrying via Cambridge tab:', err);
+  }
+  return fetchViaCambridgeTab(url, asBase64);
+}
+
+async function getCambridgeTab() {
+  const tabs = await chrome.tabs.query({ url: `${CAMBRIDGE_ORIGIN}/*` });
+  const ready = tabs.find(t => t.status === 'complete') || tabs[0];
+  if (ready) return { tab: ready, created: false };
+  const tab = await chrome.tabs.create({ url: `${CAMBRIDGE_ORIGIN}/`, active: false });
+  await waitForTabComplete(tab.id);
+  return { tab, created: true };
+}
+
+function waitForTabComplete(tabId, timeoutMs = 20000) {
+  return new Promise(resolve => {
+    const done = () => { chrome.tabs.onUpdated.removeListener(listener); clearTimeout(timer); resolve(); };
+    const listener = (id, info) => { if (id === tabId && info.status === 'complete') done(); };
+    const timer = setTimeout(done, timeoutMs);
+    chrome.tabs.onUpdated.addListener(listener);
+    chrome.tabs.get(tabId).then(t => { if (t.status === 'complete') done(); }).catch(done);
+  });
+}
+
+async function fetchViaCambridgeTab(url, asBase64) {
+  const { tab, created } = await getCambridgeTab();
+  const [injection] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    args: [url, asBase64],
+    func: async (url, asBase64) => {
+      try {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!asBase64) return { status: res.status, body: await res.text() };
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        }
+        return { status: res.status, body: btoa(binary) };
+      } catch (err) {
+        return { status: 0, body: '', error: String(err && err.message || err) };
+      }
+    },
+  });
+  const result = (injection && injection.result) || { status: 0, body: '', error: 'executeScript 无返回' };
+  result.viaTab = true;
+  // 剑桥标签页本身还停在验证页：激活它让用户完成验证
+  if (!asBase64 && isChallenge(result.status, result.body)) {
+    chrome.tabs.update(tab.id, { active: true });
+    if (created) chrome.tabs.reload(tab.id);
+  }
+  return result;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_IPA') {
     const word = encodeURIComponent(message.word);
-    const url = `https://dictionary.cambridge.org/dictionary/english-chinese-simplified/${word}`;
+    const url = `${CAMBRIDGE_ORIGIN}/dictionary/english-chinese-simplified/${word}`;
     console.log('[IPA EXT] Fetching URL:', url);
-    fetch(url)
-      .then(res => res.text())
-      .then(html => {
-        // Parse IPA from HTML
+    cambridgeFetch(url, false)
+      .then(({ status, body: html, error, viaTab }) => {
+        if (error) {
+          sendResponse({ipa: null, error: `请求失败 (HTTP ${status}${viaTab ? ', 经剑桥标签页' : ''}): ${error}`});
+          return;
+        }
+        if (isChallenge(status, html)) {
+          console.warn('[IPA EXT] Still blocked by Cloudflare challenge, HTTP', status);
+          sendResponse({ipa: null, challenge: true});
+          return;
+        }
         const ipa = extractIPA(html);
         if (!ipa) {
           console.warn('[IPA EXT] IPA not found for', message.word);
-        } else {
-          console.log('[IPA EXT] IPA found:', ipa);
+          const title = (html.match(/<title>([^<]*)/i) || [])[1] || '';
+          sendResponse({ipa: null, error: `解析失败 (HTTP ${status}, ${html.length} 字节, 标题: ${title.trim().slice(0, 80)})`});
+          return;
         }
+        console.log('[IPA EXT] IPA found', viaTab ? '(via Cambridge tab)' : '');
         sendResponse({ipa});
       })
       .catch((err) => {
         console.error('[IPA EXT] Fetch error:', err);
-        sendResponse({ipa: null});
+        sendResponse({ipa: null, error: `请求失败: ${err && err.message}`});
       });
     return true; // Indicate async response
   }
 
   if (message.type === 'FETCH_MP3_PROXY' && message.url) {
-    fetch(message.url)
-      .then(res => res.arrayBuffer())
-      .then(buffer => {
-        const base64 = arrayBufferToBase64(buffer);
-        sendResponse({ base64 });
+    cambridgeFetch(message.url, true)
+      .then(({ status, body, error }) => {
+        if (error || status < 200 || status >= 300) {
+          console.error('[IPA EXT] MP3 fetch failed:', status, error);
+          sendResponse({ base64: null });
+          return;
+        }
+        sendResponse({ base64: body });
       })
       .catch(err => {
         console.error('[IPA EXT] MP3 proxy fetch error:', err);
